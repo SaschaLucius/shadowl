@@ -1,7 +1,7 @@
-# shAdOwl
+# ShAdOwl
 
 ## owl ad shadower
-The owl which watches all of you ads out of the shadow.l 
+The owl which watches all of you ads out of the shadow.
 
 * Prepare project for Eclipse IDE: `gradle eclipse`
 * Executing tests:                 `gradle test`
