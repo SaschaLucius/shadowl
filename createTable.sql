@@ -1,0 +1,54 @@
+create database IF NOT EXISTS ebay;
+SHOW DATABASES;
+use ebay;
+
+CREATE TABLE IF NOT EXISTS category(
+	id INT NOT NULL,
+	name VARCHAR(70) NOT NULL,
+	PRIMARY KEY (id)
+)
+
+CREATE TABLE IF NOT EXISTS image(
+	ad_id INT NOT NULL, 
+ 		FOREIGN KEY (ad_id) 
+ 		REFERENCES ad(id) 
+		ON DELETE CASCADE,
+	id INT NOT NULL,
+	url VARCHAR NOT NULL,
+	PRIMARY KEY (ad_id,id)
+)
+
+CREATE TABLE IF NOT EXISTS vendor(
+	id VARCHAR NOT NULL,
+	name VARCHAR(50) NOT NULL,
+	PRIMARY KEY (id)
+)
+
+CREATE TABLE IF NOT EXISTS additionalDetails(
+	ad_id INT NOT NULL,
+	FOREIGN KEY (ad_id) 
+ 		REFERENCES ad(id) 
+ 		ON DELETE CASCADE,
+	key VARCHAR NOT NULL,
+	value VARCHAR,
+	PRIMARY KEY (ad_id,key)
+)
+
+CREATE TABLE IF NOT EXISTS ad(
+    id INT NOT NULL,
+	headline VARCHAR(70) NOT NULL,
+	description TEXT(4000) NOT NULL,
+	price VARCHAR(15),
+	vendor_id VARCHAR NULL,
+	FOREIGN KEY (vendor_id) 
+		REFERENCES vendor(id) 
+		ON DELETE CASCADE,
+	category_id INT,
+	FOREIGN KEY (category_id) 
+		REFERENCES category(id) 
+		ON DELETE CASCADE
+	location VARCHAR(70) NOT NULL,
+	time DATETIME NOT NULL,
+	PRIMARY KEY (id)
+)
+    );
