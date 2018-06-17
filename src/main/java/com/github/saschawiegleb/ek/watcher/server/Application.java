@@ -16,7 +16,7 @@
 //  ========================================================================
 //
 
-package org.eclipse.jetty.demo;
+package com.github.saschawiegleb.ek.watcher.server;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -42,44 +42,20 @@ import org.eclipse.jetty.servlet.ServletHolder;
 import org.eclipse.jetty.util.component.AbstractLifeCycle;
 import org.eclipse.jetty.webapp.Configuration;
 
-import com.github.saschawiegleb.ek.watcher.server.EkWatcher;
 import com.github.saschawiegleb.ek.watcher.sql.AdStorage;
 
-public class Main {
+public class Application {
+	private static final Logger LOG = Logger.getLogger(Application.class.getName());
+
 	// Resource path pointing to where the WEBROOT is
 	private static final String WEBROOT_INDEX = "/webroot/";
 
-	/**
-	 * JspStarter for embedded ServletContextHandlers
-	 * 
-	 * This is added as a bean that is a jetty LifeCycle on the
-	 * ServletContextHandler. This bean's doStart method will be called as the
-	 * ServletContextHandler starts, and will call the
-	 * ServletContainerInitializer for the jsp engine.
-	 *
-	 */
-	public static class JspStarter extends AbstractLifeCycle
-			implements ServletContextHandler.ServletContainerInitializerCaller {
-		JettyJasperInitializer sci;
-		ServletContextHandler context;
+	private int port;
 
-		public JspStarter(ServletContextHandler context) {
-			this.sci = new JettyJasperInitializer();
-			this.context = context;
-			this.context.setAttribute("org.apache.tomcat.JarScanner", new StandardJarScanner());
-		}
+	private Server server;
 
-		@Override
-		protected void doStart() throws Exception {
-			ClassLoader old = Thread.currentThread().getContextClassLoader();
-			Thread.currentThread().setContextClassLoader(context.getClassLoader());
-			try {
-				sci.onStartup(null, context.getServletContext());
-				super.doStart();
-			} finally {
-				Thread.currentThread().setContextClassLoader(old);
-			}
-		}
+	public Application(int port) {
+		this.port = port;
 	}
 
 	public static void main(String[] args) throws Exception {
@@ -90,62 +66,10 @@ public class Main {
 		service.schedule(refresh, 0, TimeUnit.SECONDS);
 
 		int port = 8080;
-		LoggingUtil.config();
 
-		Main main = new Main(port);
+		Application main = new Application(port);
 		main.start();
 		main.waitForInterrupt();
-	}
-
-	private static final Logger LOG = Logger.getLogger(Main.class.getName());
-
-	private int port;
-	private Server server;
-
-	public Main(int port) {
-		this.port = port;
-	}
-
-	public void start() throws Exception {
-		server = new Server();
-
-		// Define ServerConnector
-		ServerConnector connector = new ServerConnector(server);
-		connector.setPort(port);
-		server.addConnector(connector);
-
-		// Add annotation scanning (for WebAppContexts)
-		Configuration.ClassList classlist = Configuration.ClassList.setServerDefault(server);
-		classlist.addBefore("org.eclipse.jetty.webapp.JettyWebXmlConfiguration",
-				"org.eclipse.jetty.annotations.AnnotationConfiguration");
-
-		// Base URI for servlet context
-		URI baseUri = getWebRootResourceUri();
-		LOG.info("Base URI: " + baseUri);
-
-		// Create Servlet context
-		ServletContextHandler servletContextHandler = new ServletContextHandler(ServletContextHandler.SESSIONS);
-		servletContextHandler.setContextPath("/");
-		servletContextHandler.setResourceBase(baseUri.toASCIIString());
-
-		// Since this is a ServletContextHandler we must manually configure JSP
-		// support.
-		enableEmbeddedJspSupport(servletContextHandler);
-
-		// Default Servlet (always last, always named "default")
-		ServletHolder holderDefault = new ServletHolder("default", DefaultServlet.class);
-		holderDefault.setInitParameter("resourceBase", baseUri.toASCIIString());
-		holderDefault.setInitParameter("dirAllowed", "true");
-		servletContextHandler.addServlet(holderDefault, "/");
-		server.setHandler(servletContextHandler);
-
-		// Start Server
-		server.start();
-
-		// Show server state
-		if (LOG.isLoggable(Level.FINE)) {
-			LOG.fine(server.dump());
-		}
 	}
 
 	/**
@@ -203,6 +127,48 @@ public class Main {
 		return indexUri.toURI();
 	}
 
+	public void start() throws Exception {
+		server = new Server();
+
+		// Define ServerConnector
+		ServerConnector connector = new ServerConnector(server);
+		connector.setPort(port);
+		server.addConnector(connector);
+
+		// Add annotation scanning (for WebAppContexts)
+		Configuration.ClassList classlist = Configuration.ClassList.setServerDefault(server);
+		classlist.addBefore("org.eclipse.jetty.webapp.JettyWebXmlConfiguration",
+				"org.eclipse.jetty.annotations.AnnotationConfiguration");
+
+		// Base URI for servlet context
+		URI baseUri = getWebRootResourceUri();
+		LOG.info("Base URI: " + baseUri);
+
+		// Create Servlet context
+		ServletContextHandler servletContextHandler = new ServletContextHandler(ServletContextHandler.SESSIONS);
+		servletContextHandler.setContextPath("/");
+		servletContextHandler.setResourceBase(baseUri.toASCIIString());
+
+		// Since this is a ServletContextHandler we must manually configure JSP
+		// support.
+		enableEmbeddedJspSupport(servletContextHandler);
+
+		// Default Servlet (always last, always named "default")
+		ServletHolder holderDefault = new ServletHolder("default", DefaultServlet.class);
+		holderDefault.setInitParameter("resourceBase", baseUri.toASCIIString());
+		holderDefault.setInitParameter("dirAllowed", "true");
+		servletContextHandler.addServlet(holderDefault, "/");
+		server.setHandler(servletContextHandler);
+
+		// Start Server
+		server.start();
+
+		// Show server state
+		if (LOG.isLoggable(Level.FINE)) {
+			LOG.fine(server.dump());
+		}
+	}
+
 	public void stop() throws Exception {
 		server.stop();
 	}
@@ -218,5 +184,38 @@ public class Main {
 	 */
 	public void waitForInterrupt() throws InterruptedException {
 		server.join();
+	}
+
+	/**
+	 * JspStarter for embedded ServletContextHandlers
+	 * 
+	 * This is added as a bean that is a jetty LifeCycle on the
+	 * ServletContextHandler. This bean's doStart method will be called as the
+	 * ServletContextHandler starts, and will call the
+	 * ServletContainerInitializer for the jsp engine.
+	 *
+	 */
+	public static class JspStarter extends AbstractLifeCycle
+			implements ServletContextHandler.ServletContainerInitializerCaller {
+		ServletContextHandler context;
+		JettyJasperInitializer sci;
+
+		public JspStarter(ServletContextHandler context) {
+			this.sci = new JettyJasperInitializer();
+			this.context = context;
+			this.context.setAttribute("org.apache.tomcat.JarScanner", new StandardJarScanner());
+		}
+
+		@Override
+		protected void doStart() throws Exception {
+			ClassLoader old = Thread.currentThread().getContextClassLoader();
+			Thread.currentThread().setContextClassLoader(context.getClassLoader());
+			try {
+				sci.onStartup(null, context.getServletContext());
+				super.doStart();
+			} finally {
+				Thread.currentThread().setContextClassLoader(old);
+			}
+		}
 	}
 }

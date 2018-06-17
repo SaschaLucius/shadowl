@@ -1,5 +1,7 @@
 # ShAdOwl
 
+<img src="src/main/resources/webroot/static/logo.jpg?raw=true" width="500">
+
 ## owl ad shadower
 The owl which watches all of you ads out of the shadow.
 

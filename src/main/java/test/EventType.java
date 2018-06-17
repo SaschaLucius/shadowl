@@ -1,5 +1,5 @@
 package test;
 
 public enum EventType {
-	ADD, UPDATE, DELETE, RESULT;
+	ADD, DELETE, RESULT, UPDATE;
 }

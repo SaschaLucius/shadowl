@@ -30,6 +30,9 @@ import com.github.saschawiegleb.ek.watcher.sql.AdStorage;
 
 import javaslang.collection.List;
 
+/**
+ * lightweight index for searching in headline and description
+ */
 public class AdSearch implements java.io.Serializable {
 	static StandardAnalyzer analyzer = new StandardAnalyzer();
 
@@ -93,7 +96,7 @@ public class AdSearch implements java.io.Serializable {
 			// hitDoc.get("id") + " " + hitDoc.get("headline"));
 			list.add(Long.parseLong(hitDoc.get("id")));
 		}
-		
+
 		try {
 			Connection connection = AdStorage.getConnection(AdStorage.defaultConnectionType);
 			ArrayList<Ad> readAds = AdStorage.readAds(connection, list.toArray(new Long[list.size()]));
@@ -101,7 +104,7 @@ public class AdSearch implements java.io.Serializable {
 		} catch (SQLException e) {
 			e.printStackTrace();
 		}
-		
+
 		ireader.close();
 		return new ArrayList<Ad>();
 	}

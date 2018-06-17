@@ -20,34 +20,33 @@ import com.github.saschawiegleb.ek.watcher.Service;
 import javaslang.collection.List;
 import javaslang.control.Either;
 
+/**
+ * for storing the information about the ads in an database
+ */
 public class AdStorage {
-	
-	public static ConnectionType defaultConnectionType = ConnectionType.HSQL_MEM;
+	private static String AD = "CREATE TABLE IF NOT EXISTS ad(" + "id INT," + "headline VARCHAR(70) NOT NULL,"
+			+ "description TEXT(4000) NOT NULL," + "price VARCHAR(15)," + "vendor_id VARCHAR(50)," + "category_id INT,"
+			+ "location VARCHAR(70) NOT NULL," + "time DATETIME NOT NULL," + "FOREIGN KEY (vendor_id)"
+			+ "REFERENCES vendor(id)" + "ON DELETE CASCADE," + "FOREIGN KEY (category_id)" + "REFERENCES category(id)"
+			+ "ON DELETE CASCADE,	" + "PRIMARY KEY (id));";
+
+	private static String AD_INDEX = "CREATE UNIQUE INDEX id_desc_index ON ad (id DESC)";
 
 	private static String CATEGORY = "CREATE TABLE IF NOT EXISTS category(" + "id INT," + "name VARCHAR(50) NOT NULL,"
 			+ "PRIMARY KEY (id));";
 
-	private static String VENDOR = "CREATE TABLE IF NOT EXISTS vendor(" + "id VARCHAR(50),"
-			+ "name VARCHAR(50) NOT NULL,"
-			+ "PRIMARY KEY (id));";
+	public static ConnectionType defaultConnectionType = ConnectionType.HSQL_MEM;
 
-	private static String AD = "CREATE TABLE IF NOT EXISTS ad(" + "id INT," + "headline VARCHAR(70) NOT NULL,"
-			+ "description TEXT(4000) NOT NULL," + "price VARCHAR(15)," + "vendor_id VARCHAR(50),"
-			+ "category_id INT,"
-			+ "location VARCHAR(70) NOT NULL," + "time DATETIME NOT NULL,"
-			+ "FOREIGN KEY (vendor_id)" + "REFERENCES vendor(id)" + "ON DELETE CASCADE," + "FOREIGN KEY (category_id)"
-			+ "REFERENCES category(id)" + "ON DELETE CASCADE,	" + "PRIMARY KEY (id));";
-
-	private static String AD_INDEX = "CREATE UNIQUE INDEX id_desc_index ON ad (id DESC)";
+	private static String DETAILS = "CREATE TABLE IF NOT EXISTS additionalDetail(" + "ad_id INT NOT NULL,"
+			+ "FOREIGN KEY (ad_id)" + "REFERENCES ad(id)" + "ON DELETE CASCADE," + "name VARCHAR(255) NOT NULL,"
+			+ "value VARCHAR(255)," + "PRIMARY KEY (ad_id, name));";
 
 	private static String IMAGE = "CREATE TABLE IF NOT EXISTS image(" + "ad_id INT NOT NULL," + "FOREIGN KEY (ad_id)"
 			+ "REFERENCES ad(id)" + "ON DELETE CASCADE," + "id INT NOT NULL," + "url VARCHAR(255) NOT NULL,"
 			+ "PRIMARY KEY (ad_id, id));";
 
-	private static String DETAILS = "CREATE TABLE IF NOT EXISTS additionalDetail(" + "ad_id INT NOT NULL,"
-			+ "FOREIGN KEY (ad_id)"
-			+ "REFERENCES ad(id)" + "ON DELETE CASCADE," + "name VARCHAR(255) NOT NULL," + "value VARCHAR(255),"
-			+ "PRIMARY KEY (ad_id, name));";
+	private static String VENDOR = "CREATE TABLE IF NOT EXISTS vendor(" + "id VARCHAR(50),"
+			+ "name VARCHAR(50) NOT NULL," + "PRIMARY KEY (id));";
 
 	public static void createTables() {
 		try (Connection con = getConnection(defaultConnectionType)) {
@@ -150,16 +149,9 @@ public class AdStorage {
 				builder.images(readImages(conn, rs.getLong("id")));
 				builder.price(rs.getString("price"));
 				builder.location(rs.getString("location"));
-				builder.time(
-						Either.right(
-								ZonedDateTime.of(
-										LocalDateTime.ofInstant(rs.getTimestamp("time").toInstant(),
-												ZoneId.of("Europe/Berlin")),
-												ZoneId.of("Europe/Berlin")
-												)
-										)
-								)
-						;
+				builder.time(Either.right(ZonedDateTime.of(
+						LocalDateTime.ofInstant(rs.getTimestamp("time").toInstant(), ZoneId.of("Europe/Berlin")),
+						ZoneId.of("Europe/Berlin"))));
 				list.add(builder.build());
 			}
 		} catch (SQLException e) {
@@ -176,9 +168,8 @@ public class AdStorage {
 		for (Long id : ids) {
 			builder.append(id).append(",");
 		}
-		PreparedStatement statement = conn
-				.prepareStatement("SELECT * FROM ad WHERE id IN (" + builder.substring(0, builder.length() - 1)
-						+ ") ORDER BY id DESC");
+		PreparedStatement statement = conn.prepareStatement(
+				"SELECT * FROM ad WHERE id IN (" + builder.substring(0, builder.length() - 1) + ") ORDER BY id DESC");
 		ResultSet rs = statement.executeQuery();
 		return mapAds(rs, conn);
 	}

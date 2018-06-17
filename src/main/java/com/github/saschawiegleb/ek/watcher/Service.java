@@ -6,6 +6,9 @@ import com.github.saschawiegleb.ek.entity.Category;
 
 import javaslang.collection.List;
 
+/**
+ * provides access to all relevant methods of the ek-api
+ */
 public class Service {
 	private static final EkService service = new EkService();
 	private static final Category category = service.getCategory(245);

@@ -1,5 +1,8 @@
 package com.github.saschawiegleb.ek.watcher.sql;
 
+/**
+ * for different database types
+ */
 public enum ConnectionType {
-	MY_SQL, HSQL_FILE, HSQL_MEM
+	HSQL_FILE, HSQL_MEM, MY_SQL
 }

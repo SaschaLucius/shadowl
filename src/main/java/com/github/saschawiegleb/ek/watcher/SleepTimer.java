@@ -2,10 +2,13 @@ package com.github.saschawiegleb.ek.watcher;
 
 import java.util.concurrent.TimeUnit;
 
+/**
+ * timer to wait between parsing next ads
+ */
 public class SleepTimer {
 
 	private static double SLEEP_TIMER = 90.0d;
-	
+
 	public static double getTimer() {
 		return SLEEP_TIMER;
 	}

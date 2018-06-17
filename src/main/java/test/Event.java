@@ -1,8 +1,12 @@
 package test;
 
 public class Event {
-	EventType type;
 	private int id = 0;
+	EventType type;
+
+	protected Event(EventType type) {
+		this.type = type;
+	}
 
 	public int getId() {
 		return id;
@@ -10,10 +14,6 @@ public class Event {
 
 	public void setId(int id) {
 		this.id = id;
-	}
-
-	protected Event(EventType type) {
-		this.type = type;
 	}
 
 }

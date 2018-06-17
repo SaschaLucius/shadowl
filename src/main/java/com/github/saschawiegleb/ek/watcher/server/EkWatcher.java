@@ -16,6 +16,9 @@ import com.github.saschawiegleb.ek.watcher.sql.AdStorage;
 
 import javaslang.collection.List;
 
+/**
+ * core logic to watch incoming ads
+ */
 public class EkWatcher implements Runnable {
 	private static final Logger logger = Logger.getLogger(EkWatcher.class.getName());
 
@@ -50,8 +53,7 @@ public class EkWatcher implements Runnable {
 
 		final long timeStart = System.currentTimeMillis();
 		List<Ad> adsLightweight = Service.getLatestAds(latestAdId);
-		System.out.println(
-				"Get Ads: " + (System.currentTimeMillis() - timeStart) / 1000 + " Sekunden");
+		System.out.println("Get Ads: " + (System.currentTimeMillis() - timeStart) / 1000 + " Sekunden");
 
 		try (Connection conn = AdStorage.getConnection(AdStorage.defaultConnectionType)) {
 			conn.setAutoCommit(false);

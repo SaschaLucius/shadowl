@@ -8,6 +8,8 @@ import java.util.Map;
 public class EventBus {
 	private static EventBus bus = new EventBus();
 
+	private Map<EventType, List<EventListener>> map = new HashMap<EventType, List<EventListener>>();
+
 	private EventBus() {
 	}
 
@@ -15,7 +17,13 @@ public class EventBus {
 		return bus;
 	}
 
-	private Map<EventType, List<EventListener>> map = new HashMap<EventType, List<EventListener>>();
+	void submit(Event event) {
+		if (map.containsKey(event.type)) {
+			for (EventListener o : map.get(event.type)) {
+				submit(o.incomingEvent(event));
+			}
+		}
+	}
 
 	void subscribe(EventType event, EventListener object) {
 		if (!map.containsKey(event)) {
@@ -34,14 +42,6 @@ public class EventBus {
 		List<EventListener> list = map.get(event);
 		if (list.contains(object)) {
 			list.remove(object);
-		}
-	}
-
-	void submit(Event event) {
-		if (map.containsKey(event.type)) {
-			for (EventListener o : map.get(event.type)) {
-				submit(o.incomingEvent(event));
-			}
 		}
 	}
 }
