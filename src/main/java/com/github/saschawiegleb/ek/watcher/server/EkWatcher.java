@@ -2,11 +2,11 @@ package com.github.saschawiegleb.ek.watcher.server;
 
 import java.sql.Connection;
 import java.sql.SQLException;
-import java.text.SimpleDateFormat;
-import java.util.Calendar;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.logging.Logger;
+
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import com.github.saschawiegleb.ek.entity.Ad;
 import com.github.saschawiegleb.ek.watcher.Service;
@@ -20,57 +20,50 @@ import javaslang.collection.List;
  * core logic to watch incoming ads
  */
 public class EkWatcher implements Runnable {
-	private static final Logger logger = Logger.getLogger(EkWatcher.class.getName());
+	private static final Logger logger = LogManager.getLogger(EkWatcher.class);
 
-	ScheduledExecutorService _service = null;
+	private final AdSearch _search;
+	private final ScheduledExecutorService _service;
+	private final AdStorage _storage;
 
-	public EkWatcher(ScheduledExecutorService service) {
+	public EkWatcher(ScheduledExecutorService service, AdSearch search, AdStorage storage) {
 		_service = service;
+		_search = search;
+		_storage = storage;
 	}
 
-	// public static void main(String[] args) {
-	// AdStorage.loadDriver();
-	// AdStorage.createTables();
-	// ScheduledExecutorService service = Executors.newScheduledThreadPool(1);
-	// final Runnable refresh = new EkWatcher(service);
-	// service.schedule(refresh, 0, TimeUnit.SECONDS);
-	// }
+	private long latestAdId() {
+		try (Connection conn = _storage.getConnection()) {
+			return _storage.getLatestAdId(conn);
+		} catch (SQLException e) {
+			logger.error(e);
+		}
+		return 0;
+	}
 
 	@Override
 	public void run() {
-		Calendar cal = Calendar.getInstance();
-		SimpleDateFormat sdf = new SimpleDateFormat("HH:mm:ss");
-		logger.info("Start: " + sdf.format(cal.getTime()));
-
-		Ad currentAd = null; // for error handling
-
-		long latestAdId = 0;
-		try (Connection conn = AdStorage.getConnection(AdStorage.defaultConnectionType)) {
-			latestAdId = AdStorage.getLatestAdId(conn);
-		} catch (SQLException e) {
-			e.printStackTrace();
-		}
-
 		final long timeStart = System.currentTimeMillis();
+		long latestAdId = latestAdId();
+		logger.info("Latest ad: " + latestAdId);
 		List<Ad> adsLightweight = Service.getLatestAds(latestAdId);
-		System.out.println("Get Ads: " + (System.currentTimeMillis() - timeStart) / 1000 + " Sekunden");
+		logger.info(String.format("Get %s Ads in %s seconds.", adsLightweight.length(),
+				(System.currentTimeMillis() - timeStart) / 1000));
 
-		try (Connection conn = AdStorage.getConnection(AdStorage.defaultConnectionType)) {
+		storeAds(adsLightweight);
+		_search.insertAdsLucene(adsLightweight);
+
+		_service.schedule(this, (long) SleepTimer.resizeAndGet(adsLightweight.length()), TimeUnit.SECONDS);
+	}
+
+	private void storeAds(List<Ad> adsLightweight) {
+		try (Connection conn = _storage.getConnection()) {
 			conn.setAutoCommit(false);
 			for (Ad ad : adsLightweight) {
-				currentAd = ad;
-				AdStorage.insertFullAd(ad, conn);
+				_storage.insertFullAd(ad, conn);
 			}
 		} catch (SQLException e) {
-			System.err.println(currentAd);
-			e.printStackTrace();
+			logger.error(e);
 		}
-
-		AdSearch.insertAdsLucene(adsLightweight);
-		logger.info("End: " + sdf.format(cal.getTime()));
-		SleepTimer.resizeAndSleep(adsLightweight.length());
-
-		// schedule again
-		_service.schedule(this, (long) SleepTimer.getTimer(), TimeUnit.SECONDS);
 	}
 }

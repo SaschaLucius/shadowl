@@ -1,67 +1,29 @@
 package com.github.saschawiegleb.ek.watcher;
 
-import java.util.concurrent.TimeUnit;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 /**
  * timer to wait between parsing next ads
  */
 public class SleepTimer {
+	private static final Logger logger = LogManager.getLogger(SleepTimer.class);
 
-	private static double SLEEP_TIMER = 90.0d;
+	private static double SLEEP_TIMER = Config.INTERVAL.getFloat();
 
-	public static double getTimer() {
+	public static double resizeAndGet(int count) {
+		int diff = 0;
+		if (count <= Config.EXPECTEDAMOUNT.getInt()) {
+			diff = Math.min(Config.EXPECTEDAMOUNT.getInt() - count, Config.MAXDEVIATION.getInt());
+		} else {
+			diff = Math.max(Config.EXPECTEDAMOUNT.getInt() - count, -Config.MAXDEVIATION.getInt());
+		}
+
+		SLEEP_TIMER += Config.TIMESTEP.getFloat() * diff;
+		if (SLEEP_TIMER < 0) {
+			SLEEP_TIMER = 0;
+		}
+		logger.debug("New SleepTimer is: " + SLEEP_TIMER);
 		return SLEEP_TIMER;
-	}
-
-	public static void resizeAndSleep(int count) {
-		resizeSleepTimer(count);
-		try {
-			TimeUnit.SECONDS.sleep((long) SLEEP_TIMER);
-		} catch (InterruptedException e) {
-			e.printStackTrace();
-		}
-	}
-
-	private static void resizeSleepTimer(int count) {
-		switch (count) {
-		case 0:
-			SLEEP_TIMER += 1.0d;
-			break;
-		case 1:
-			SLEEP_TIMER += 0.8d;
-			break;
-		case 2:
-			SLEEP_TIMER += 0.6d;
-			break;
-		case 3:
-			SLEEP_TIMER += 0.4d;
-			break;
-		case 4:
-			SLEEP_TIMER += 0.2d;
-			break;
-		case 5:
-			// SLEEP_TIMER += 0;
-			break;
-		case 6:
-			SLEEP_TIMER -= 0.2d;
-			break;
-		case 7:
-			SLEEP_TIMER -= 0.4d;
-			break;
-		case 8:
-			SLEEP_TIMER -= 0.6d;
-			break;
-		case 9:
-			SLEEP_TIMER -= 0.8d;
-			break;
-		case 10:
-			SLEEP_TIMER -= 1.0d;
-			break;
-		default:
-			SLEEP_TIMER -= 1.0d;
-			break;
-		}
-
-		System.out.println(SLEEP_TIMER);
 	}
 }

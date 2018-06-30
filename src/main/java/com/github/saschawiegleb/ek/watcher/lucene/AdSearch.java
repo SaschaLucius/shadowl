@@ -2,10 +2,10 @@ package com.github.saschawiegleb.ek.watcher.lucene;
 
 import java.io.File;
 import java.io.IOException;
-import java.sql.Connection;
-import java.sql.SQLException;
 import java.util.ArrayList;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field.Store;
@@ -26,7 +26,7 @@ import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
 
 import com.github.saschawiegleb.ek.entity.Ad;
-import com.github.saschawiegleb.ek.watcher.sql.AdStorage;
+import com.github.saschawiegleb.ek.watcher.Config;
 
 import javaslang.collection.List;
 
@@ -36,76 +36,66 @@ import javaslang.collection.List;
 public class AdSearch implements java.io.Serializable {
 	static StandardAnalyzer analyzer = new StandardAnalyzer();
 
-	static Directory index = null;
+	private static final String DESCRIPTION = "description";
+	private static final String HEADLINE = "headline";
+	private static final String ID = "id";
+	private static final String ID_INDEX = "id_index";
+	private static final Logger logger = LogManager.getLogger(AdSearch.class);
+
 	private static final long serialVersionUID = 1L;
-	static {
+
+	private Directory _index = null;
+
+	public AdSearch() {
 		try {
-			index = FSDirectory.open(new File("/tmp/testindex").toPath());
+			_index = FSDirectory.open(new File(Config.INDEXFOLDER.get() + "/index").toPath());
 		} catch (IOException e) {
-			e.printStackTrace();
+			logger.error(e);
 		}
 	}
 
 	private static void addDoc(IndexWriter w, Ad ad) throws IOException {
 		Document doc = new Document();
-		doc.add(new NumericDocValuesField("id_index", ad.id()));
-		doc.add(new StoredField("id", ad.id()));
-		doc.add(new TextField("headline", ad.headline(), Store.YES));
-		doc.add(new TextField("description", ad.description(), Store.YES));
+		doc.add(new NumericDocValuesField(ID_INDEX, ad.id()));
+		doc.add(new StoredField(ID, ad.id()));
+		doc.add(new TextField(HEADLINE, ad.headline(), Store.YES));
+		doc.add(new TextField(DESCRIPTION, ad.description(), Store.YES));
 		w.addDocument(doc);
 	}
 
-	public static void insertAdsLucene(List<Ad> ads) {
+	public void insertAdsLucene(List<Ad> ads) {
 		IndexWriterConfig config = new IndexWriterConfig(analyzer);
-		try (IndexWriter w = new IndexWriter(index, config)) {
+		try (IndexWriter w = new IndexWriter(_index, config)) {
 			for (Ad ad : ads) {
 				addDoc(w, ad);
 			}
 		} catch (IOException e) {
-			e.printStackTrace();
+			logger.error(e);
 		}
 	}
 
-	public static long[] toPrimitives(ArrayList<Long> list) {
-		long[] primitives = new long[list.size()];
-		for (int i = 0; i < list.size(); i++)
-			primitives[i] = list.get(i);
-		return primitives;
-	}
-
-	public ArrayList<Ad> luceneQuery(String searchString) throws IOException, ParseException {
+	public ArrayList<Long> luceneQuery(String searchString) throws IOException, ParseException {
 		if (searchString == null || searchString.isEmpty()) {
-			return new ArrayList<Ad>();
+			return new ArrayList<Long>();
 		}
-		// Now search the index:
-		DirectoryReader ireader = DirectoryReader.open(index);
-		IndexSearcher isearcher = new IndexSearcher(ireader);
-		// Parse a simple query that searches for "text":
-		MultiFieldQueryParser parser = new MultiFieldQueryParser(new String[] { "headline", "description" }, analyzer);
-		// QueryParser parser = new QueryParser("description", analyzer);
-		Sort sort = new Sort(new SortField("id_index", SortField.Type.LONG, true));
+		// search the index
+		DirectoryReader reader = DirectoryReader.open(_index);
+		IndexSearcher searcher = new IndexSearcher(reader);
+		// parse query
+		MultiFieldQueryParser parser = new MultiFieldQueryParser(new String[] { HEADLINE, DESCRIPTION }, analyzer);
+		Sort sort = new Sort(new SortField(ID_INDEX, SortField.Type.LONG, true));
 		Query query = parser.parse(searchString);
-		ScoreDoc[] hits = isearcher.search(query, 50, sort).scoreDocs;
+		ScoreDoc[] hits = searcher.search(query, Config.RESULTS.getInt(), sort).scoreDocs;
 
-		System.out.println("Found " + hits.length + " results in " + ireader.numDocs() + " indeced Documents");
-		// Iterate through the results:
-		ArrayList<Long> list = new ArrayList<Long>();
+		logger.info("Found " + hits.length + " results in " + reader.numDocs() + " indeced Documents");
+		// iterate through the results:
+		ArrayList<Long> adIds = new ArrayList<Long>();
 		for (int i = 0; i < hits.length; i++) {
-			Document hitDoc = isearcher.doc(hits[i].doc);
-			// System.out.println("This is the text to be indexed: " +
-			// hitDoc.get("id") + " " + hitDoc.get("headline"));
-			list.add(Long.parseLong(hitDoc.get("id")));
+			Document hitDoc = searcher.doc(hits[i].doc);
+			adIds.add(Long.parseLong(hitDoc.get(ID)));
 		}
 
-		try {
-			Connection connection = AdStorage.getConnection(AdStorage.defaultConnectionType);
-			ArrayList<Ad> readAds = AdStorage.readAds(connection, list.toArray(new Long[list.size()]));
-			return readAds;
-		} catch (SQLException e) {
-			e.printStackTrace();
-		}
-
-		ireader.close();
-		return new ArrayList<Ad>();
+		reader.close();
+		return adIds;
 	}
 }

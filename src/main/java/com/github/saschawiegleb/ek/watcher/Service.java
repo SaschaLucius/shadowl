@@ -11,13 +11,20 @@ import javaslang.collection.List;
  */
 public class Service {
 	private static final EkService service = new EkService();
-	private static final Category category = service.getCategory(245);
+	private static Category category = service.getCategory(Config.CATEGORY.getInt());
+
+	public static List<Category> getCategories() {
+		return service.getCategories();
+	}
 
 	public static List<Ad> getLatestAds(long latestAdId) {
+		refreshCategoryIfNeeded();
 		return service.getLatestAds(category, latestAdId);
 	}
 
-	public static EkService getService() {
-		return service;
+	private static void refreshCategoryIfNeeded() {
+		if (category.id() != Config.CATEGORY.getInt()) {
+			category = service.getCategory(Config.CATEGORY.getInt());
+		}
 	}
 }

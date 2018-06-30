@@ -12,9 +12,13 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
 import com.github.saschawiegleb.ek.entity.Ad;
 import com.github.saschawiegleb.ek.entity.Category;
 import com.github.saschawiegleb.ek.entity.ImmutableAd;
+import com.github.saschawiegleb.ek.watcher.Config;
 import com.github.saschawiegleb.ek.watcher.Service;
 
 import javaslang.collection.List;
@@ -24,143 +28,78 @@ import javaslang.control.Either;
  * for storing the information about the ads in an database
  */
 public class AdStorage {
-	private static String AD = "CREATE TABLE IF NOT EXISTS ad(" + "id INT," + "headline VARCHAR(70) NOT NULL,"
+	private static final String AD = "CREATE TABLE IF NOT EXISTS ad(" + "id INT," + "headline VARCHAR(70) NOT NULL,"
 			+ "description TEXT(4000) NOT NULL," + "price VARCHAR(15)," + "vendor_id VARCHAR(50)," + "category_id INT,"
 			+ "location VARCHAR(70) NOT NULL," + "time DATETIME NOT NULL," + "FOREIGN KEY (vendor_id)"
 			+ "REFERENCES vendor(id)" + "ON DELETE CASCADE," + "FOREIGN KEY (category_id)" + "REFERENCES category(id)"
 			+ "ON DELETE CASCADE,	" + "PRIMARY KEY (id));";
 
-	private static String AD_INDEX = "CREATE UNIQUE INDEX id_desc_index ON ad (id DESC)";
+	private static final String AD_INDEX = "CREATE UNIQUE INDEX id_desc_index ON ad (id DESC)";
 
-	private static String CATEGORY = "CREATE TABLE IF NOT EXISTS category(" + "id INT," + "name VARCHAR(50) NOT NULL,"
+	private static final String CATEGORY = "CREATE TABLE IF NOT EXISTS category(" + "id INT,"
+			+ "name VARCHAR(50) NOT NULL,"
 			+ "PRIMARY KEY (id));";
 
-	public static ConnectionType defaultConnectionType = ConnectionType.HSQL_MEM;
-
-	private static String DETAILS = "CREATE TABLE IF NOT EXISTS additionalDetail(" + "ad_id INT NOT NULL,"
+	private static final String DETAILS = "CREATE TABLE IF NOT EXISTS additionalDetail(" + "ad_id INT NOT NULL,"
 			+ "FOREIGN KEY (ad_id)" + "REFERENCES ad(id)" + "ON DELETE CASCADE," + "name VARCHAR(255) NOT NULL,"
 			+ "value VARCHAR(255)," + "PRIMARY KEY (ad_id, name));";
 
-	private static String IMAGE = "CREATE TABLE IF NOT EXISTS image(" + "ad_id INT NOT NULL," + "FOREIGN KEY (ad_id)"
+	private static final String IMAGE = "CREATE TABLE IF NOT EXISTS image(" + "ad_id INT NOT NULL,"
+			+ "FOREIGN KEY (ad_id)"
 			+ "REFERENCES ad(id)" + "ON DELETE CASCADE," + "id INT NOT NULL," + "url VARCHAR(255) NOT NULL,"
 			+ "PRIMARY KEY (ad_id, id));";
 
-	private static String VENDOR = "CREATE TABLE IF NOT EXISTS vendor(" + "id VARCHAR(50),"
+	private static final Logger logger = LogManager.getLogger(AdStorage.class);
+
+	private static final String VENDOR = "CREATE TABLE IF NOT EXISTS vendor(" + "id VARCHAR(50),"
 			+ "name VARCHAR(50) NOT NULL," + "PRIMARY KEY (id));";
 
-	public static void createTables() {
-		try (Connection con = getConnection(defaultConnectionType)) {
-			Statement stmt = null;
-			stmt = con.createStatement();
-			stmt.executeUpdate(CATEGORY);
-			stmt.executeUpdate(VENDOR);
-			stmt.executeUpdate(AD);
-			stmt.executeUpdate(AD_INDEX);
-			stmt.executeUpdate(IMAGE);
-			stmt.executeUpdate(DETAILS);
-			injectCategories(con);
-		} catch (Exception e) {
-			e.printStackTrace(System.out);
-		}
-	}
-
-	public static Connection getConnection(ConnectionType type) throws SQLException {
-		// TODO move to ConnectionType
-		switch (type) {
-		case HSQL_FILE:
-			return DriverManager.getConnection("jdbc:hsqldb:file:testdb;sql.syntax_mys=true", "SA", "");
-		case HSQL_MEM:
-			return DriverManager.getConnection("jdbc:hsqldb:mem:mymemdb;sql.syntax_mys=true", "SA", "");
-		case MY_SQL:
-			return DriverManager.getConnection("jdbc:mysql://localhost:3306/ebay", "root", "");
-		default:
-			throw new UnsupportedOperationException();
-		}
-	}
-
-	public static long getLatestAdId(Connection conn) throws SQLException {
-		ResultSet rs = conn.prepareStatement("SELECT id FROM ad ORDER BY id DESC LIMIT 1").executeQuery();
-		boolean next = rs.next();
-		if (!next) {
-			return 0;
-		}
-		return rs.getLong(1);
-	}
-
-	private static void injectCategories(Connection conn) throws SQLException {
-		ResultSet rs = conn.prepareStatement("SELECT * FROM category where id='" + 0 + "'").executeQuery();
-		if (rs.next()) {
+	private static void injectCategories(Connection connection) throws SQLException {
+		String query = String.format("SELECT * FROM category where id='%s'", 0);
+		ResultSet resultSet = connection.prepareStatement(query).executeQuery();
+		if (resultSet.next()) {
 			return;
 		}
-		for (Category cat : Service.getService().getCategorys()) {
-			Statement st = conn.createStatement();
-			st.executeUpdate("INSERT INTO category VALUES ('" + cat.id() + "','" + cat.name() + "')");
+		for (Category category : Service.getCategories()) {
+			Statement statement = connection.createStatement();
+			String insert = String.format("INSERT INTO category VALUES ('%s','%s')", category.id(), category.name());
+			statement.executeUpdate(insert);
 		}
-		conn.commit();
-	}
-
-	private static void insertAd(Ad ad, Connection conn) throws SQLException {
-		Statement st = conn.createStatement();
-		st.executeUpdate("INSERT INTO ad VALUES ('" + ad.id() + "','" + ad.headline().replaceAll("'", "-") + "','"
-				+ ad.description().replaceAll("'", "-") + "','" + ad.price() + "','" + ad.vendorId() + "','"
-				+ ad.category().id() + "','" + ad.location() + "','"
-				+ (ad.time().isRight() ? DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").format(ad.time().get())
-						: DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").format(LocalDateTime.now()))
-				+ "')");
-	}
-
-	public static void insertFullAd(Ad ad, Connection conn) throws SQLException {
-		insertVendor(ad, conn);
-		insertAd(ad, conn);
-		insertImages(ad, conn);
-		conn.commit();
-	}
-
-	private static void insertImages(Ad ad, Connection conn) throws SQLException {
-		Statement st = conn.createStatement();
-		for (int i = 0; i < ad.images().length(); i++) {
-			st.executeUpdate("INSERT INTO image VALUES ('" + ad.id() + "','" + i + "','" + ad.images().get(i) + "')");
-		}
-	}
-
-	private static void insertVendor(Ad ad, Connection conn) throws SQLException {
-		Statement st = conn.createStatement();
-		st.executeUpdate("INSERT INTO vendor (id,name) VALUES ('" + ad.vendorId() + "','"
-				+ ad.vendorName().replaceAll("'", "-") + "') ON DUPLICATE KEY UPDATE name=VALUES(name)");
+		connection.commit();
 	}
 
 	public static void loadDriver() {
 		try {
-			Class.forName("com.mysql.cj.jdbc.Driver").newInstance();
-			Class.forName("org.hsqldb.jdbc.JDBCDriver").newInstance();
+			Class.forName("com.mysql.cj.jdbc.Driver").getDeclaredConstructor().newInstance();
+			Class.forName("org.hsqldb.jdbc.JDBCDriver").getDeclaredConstructor().newInstance();
 		} catch (Exception e) {
-			e.printStackTrace(System.out);
+			logger.error(e);
 		}
 	}
 
-	static ArrayList<Ad> mapAds(ResultSet rs, Connection conn) {
-		ArrayList<Ad> list = new ArrayList<Ad>();
+	static ArrayList<Ad> mapAds(ResultSet resultSet, Connection connection) {
+		ArrayList<Ad> adList = new ArrayList<Ad>();
 		try {
-			while (rs.next()) {
+			while (resultSet.next()) {
 				ImmutableAd.Builder builder = ImmutableAd.builder();
-				builder.id(rs.getLong("id"));
-				builder.headline(rs.getString("headline"));
-				builder.description(rs.getString("description"));
-				builder.images(readImages(conn, rs.getLong("id")));
-				builder.price(rs.getString("price"));
-				builder.location(rs.getString("location"));
+				builder.id(resultSet.getLong("id"));
+				builder.headline(resultSet.getString("headline"));
+				builder.description(resultSet.getString("description"));
+				builder.images(readImages(connection, resultSet.getLong("id")));
+				builder.price(resultSet.getString("price"));
+				builder.location(resultSet.getString("location"));
 				builder.time(Either.right(ZonedDateTime.of(
-						LocalDateTime.ofInstant(rs.getTimestamp("time").toInstant(), ZoneId.of("Europe/Berlin")),
+						LocalDateTime.ofInstant(resultSet.getTimestamp("time").toInstant(), ZoneId.of("Europe/Berlin")),
 						ZoneId.of("Europe/Berlin"))));
-				list.add(builder.build());
+				adList.add(builder.build());
 			}
 		} catch (SQLException e) {
-			e.printStackTrace(System.out);
+			logger.error(e);
 		}
-		return list;
+		return adList;
 	}
 
-	public static ArrayList<Ad> readAds(Connection conn, Long[] ids) throws SQLException {
+	public static ArrayList<Ad> readAds(Connection connection, Long[] ids) throws SQLException {
 		if (ids.length == 0) {
 			return new ArrayList<Ad>();
 		}
@@ -168,19 +107,83 @@ public class AdStorage {
 		for (Long id : ids) {
 			builder.append(id).append(",");
 		}
-		PreparedStatement statement = conn.prepareStatement(
-				"SELECT * FROM ad WHERE id IN (" + builder.substring(0, builder.length() - 1) + ") ORDER BY id DESC");
-		ResultSet rs = statement.executeQuery();
-		return mapAds(rs, conn);
+		String query = String.format("SELECT * FROM ad WHERE id IN (%s) ORDER BY id DESC",
+				builder.substring(0, builder.length() - 1));
+		PreparedStatement statement = connection.prepareStatement(query);
+		ResultSet resultSet = statement.executeQuery();
+		return mapAds(resultSet, connection);
 	}
 
-	public static List<String> readImages(Connection conn, Long id) throws SQLException {
-		ArrayList<String> list = new ArrayList<String>();
-		PreparedStatement statement = conn.prepareStatement("select * from image where ad_id = " + id + " ORDER BY id");
-		ResultSet rs = statement.executeQuery();
-		while (rs.next()) {
-			list.add(rs.getString("url"));
+	public static List<String> readImages(Connection connection, Long adId) throws SQLException {
+		ArrayList<String> imageList = new ArrayList<String>();
+		String query = String.format("select * from image where ad_id = %s ORDER BY id", adId);
+		PreparedStatement statement = connection.prepareStatement(query);
+		ResultSet resultSet = statement.executeQuery();
+		while (resultSet.next()) {
+			imageList.add(resultSet.getString("url"));
 		}
-		return List.ofAll(list);
+		return List.ofAll(imageList);
+	}
+
+	public void createTables() { // TODO add connection as parameter
+		try (Connection connection = getConnection()) {
+			Statement statement = null;
+			statement = connection.createStatement();
+			statement.executeUpdate(CATEGORY);
+			statement.executeUpdate(VENDOR);
+			statement.executeUpdate(AD);
+			statement.executeUpdate(AD_INDEX);
+			statement.executeUpdate(IMAGE);
+			statement.executeUpdate(DETAILS);
+			injectCategories(connection);
+		} catch (Exception e) {
+			logger.error(e);
+		}
+	}
+
+	public Connection getConnection() throws SQLException { // TODO add helper methods for all external calls
+		return DriverManager.getConnection(Config.CONNECTION.get());
+	}
+
+	public long getLatestAdId(Connection connection) throws SQLException {
+		ResultSet resultSet = connection.prepareStatement("SELECT id FROM ad ORDER BY id DESC LIMIT 1").executeQuery();
+		if (!resultSet.next()) {
+			return 0;
+		}
+		return resultSet.getLong(1);
+	}
+
+	private void insertAd(Ad ad, Connection connection) throws SQLException {
+		Statement statement = connection.createStatement();
+		statement.executeUpdate("INSERT INTO ad VALUES ('" + ad.id() + "','" + ad.headline().replaceAll("'", "-") + "','"
+				+ ad.description().replaceAll("'", "-") + "','" + ad.price() + "','" + ad.vendorId() + "','"
+				+ ad.category().id() + "','" + ad.location() + "','"
+				+ (ad.time().isRight() ? DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").format(ad.time().get())
+						: DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").format(LocalDateTime.now()))
+				+ "')");
+	}
+
+	public void insertFullAd(Ad ad, Connection connection) throws SQLException {
+		insertVendor(ad, connection);
+		insertAd(ad, connection);
+		insertImages(ad, connection);
+		connection.commit();
+	}
+
+	private void insertImages(Ad ad, Connection connection) throws SQLException {
+		Statement st = connection.createStatement();
+		for (int i = 0; i < ad.images().length(); i++) {
+			String statement = String.format("INSERT INTO image VALUES ('%s','%s','%s')", ad.id(), i,
+					ad.images().get(i));
+			st.executeUpdate(statement);
+		}
+	}
+
+	private void insertVendor(Ad ad, Connection connection) throws SQLException {
+		Statement statement = connection.createStatement();
+		String insert = String.format(
+				"INSERT INTO vendor (id,name) VALUES ('%s','%s') ON DUPLICATE KEY UPDATE name=VALUES(name)",
+				ad.vendorId(), ad.vendorName().replaceAll("'", "-"));
+		statement.executeUpdate(insert);
 	}
 }
