@@ -10,9 +10,10 @@ import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
-import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.apache.lucene.queryparser.classic.ParseException;
 
 import com.github.saschawiegleb.ek.entity.Ad;
@@ -21,19 +22,7 @@ import com.github.saschawiegleb.ek.watcher.sql.AdStorage;
 
 @Path("search")
 public class AdController {
-	@GET
-	@Path("test3/{name}") // ad/test3/world
-	@Produces(MediaType.TEXT_PLAIN)
-	public String pathParam(@PathParam("name") String name) {
-		return "Hello, " + name;
-	}
-
-	@GET
-	@Path("test2") // ad/test2?name=world
-	@Produces(MediaType.TEXT_PLAIN)
-	public String queryParam(@QueryParam("name") String name) {
-		return "Hello, " + name;
-	}
+	private static final Logger logger = LogManager.getLogger(AdController.class);
 
 	@GET
 	@Produces(MediaType.APPLICATION_JSON)
@@ -47,15 +36,8 @@ public class AdController {
 			List<Ad> readAds = AdStorage.readAds(connection, luceneQuery.toArray(new Long[luceneQuery.size()]));
 			return readAds;
 		} catch (SQLException | IOException | ParseException e) {
-			e.printStackTrace();
+			logger.error(e);
 		}
 		return new ArrayList<Ad>();
-	}
-
-	@GET
-	@Path("test1") // ad/test1
-	@Produces(MediaType.TEXT_PLAIN)
-	public String test() {
-		return "Hello, world";
 	}
 }

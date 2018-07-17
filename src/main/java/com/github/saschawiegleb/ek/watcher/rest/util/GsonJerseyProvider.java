@@ -17,16 +17,30 @@ import javax.ws.rs.ext.MessageBodyReader;
 import javax.ws.rs.ext.MessageBodyWriter;
 import javax.ws.rs.ext.Provider;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
 @Provider
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
 public class GsonJerseyProvider implements MessageBodyWriter<Object>, MessageBodyReader<Object> {
+	private static final Logger logger = LogManager.getLogger(GsonJerseyProvider.class);
 
 	private static final String UTF_8 = "UTF-8";
 
 	@Override
+	public long getSize(Object object, Class<?> type, Type genericType, Annotation[] annotations, MediaType mediaType) {
+		return -1;
+	}
+
+	@Override
 	public boolean isReadable(Class<?> type, Type genericType, java.lang.annotation.Annotation[] annotations,
 			MediaType mediaType) {
+		return true;
+	}
+
+	@Override
+	public boolean isWriteable(Class<?> type, Type genericType, Annotation[] annotations, MediaType mediaType) {
 		return true;
 	}
 
@@ -37,21 +51,11 @@ public class GsonJerseyProvider implements MessageBodyWriter<Object>, MessageBod
 		try {
 			return GsonUtil.getInstance().fromJson(streamReader, genericType);
 		} catch (com.google.gson.JsonSyntaxException e) {
-			// Log exception
+			logger.error(e);
 		} finally {
 			streamReader.close();
 		}
 		return null;
-	}
-
-	@Override
-	public boolean isWriteable(Class<?> type, Type genericType, Annotation[] annotations, MediaType mediaType) {
-		return true;
-	}
-
-	@Override
-	public long getSize(Object object, Class<?> type, Type genericType, Annotation[] annotations, MediaType mediaType) {
-		return -1;
 	}
 
 	@Override
@@ -61,7 +65,10 @@ public class GsonJerseyProvider implements MessageBodyWriter<Object>, MessageBod
 		OutputStreamWriter writer = new OutputStreamWriter(entityStream, UTF_8);
 		try {
 			GsonUtil.getInstance().toJson(object, genericType, writer);
+		} catch (Exception e) {
+			logger.error(e);
 		} finally {
+
 			writer.close();
 		}
 	}
