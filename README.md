@@ -11,7 +11,5 @@ The owl which watches all of you ads out of the shadow.
 `gradle test`
 * Create JAR:
 `gradle jar`
-* Create a fat-JAR:
-`gradle shadowJar`
 * run application:
 `gradle run`
